@@ -1,0 +1,7 @@
+Flask
+PyMuPDF
+PyPDF2
+pdf2image
+reportlab
+python-docx
+Pillow
