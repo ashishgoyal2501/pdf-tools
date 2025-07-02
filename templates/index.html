@@ -1,39 +1,140 @@
-
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8">
-  <title>PDF Tools - Live</title>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>PDF Tools</title>
+  <style>
+    body {
+      font-family: sans-serif;
+      background: #f7f7f7;
+      margin: 0;
+      padding: 0;
+    }
+    .container {
+      max-width: 600px;
+      margin: 80px auto;
+      padding: 40px;
+      background: white;
+      border-radius: 10px;
+      box-shadow: 0 0 10px rgba(0,0,0,0.2);
+      text-align: center;
+    }
+    input[type="file"],
+    select,
+    input[type="password"],
+    button {
+      margin: 15px 0;
+      padding: 12px;
+      font-size: 16px;
+      width: 100%;
+    }
+    #processing-container {
+      display: none;
+      margin-top: 20px;
+    }
+    .progress-bar {
+      height: 8px;
+      width: 100%;
+      background: #eee;
+      border-radius: 5px;
+      overflow: hidden;
+    }
+    .progress {
+      height: 8px;
+      background: #4caf50;
+      width: 0%;
+      transition: width 1s;
+    }
+    #result-container {
+      display: none;
+      margin-top: 20px;
+      color: green;
+    }
+  </style>
 </head>
-<body style="font-family: sans-serif; padding: 40px; text-align: center;">
-  <h1>PDF Tools - Upload & Process</h1>
+<body>
+  <div class="container">
+    <h2>All-in-One PDF Tool</h2>
+    <form id="pdfForm" enctype="multipart/form-data">
+      <input type="file" id="file" name="file" accept=".pdf" required />
+      
+      <select name="tool" id="tool">
+        <option value="compress">Compress PDF</option>
+        <option value="merge">Merge PDF</option>
+        <option value="split">Split PDF</option>
+        <option value="lock">Lock PDF</option>
+        <option value="convert">Convert PDF</option>
+      </select>
 
-  <form id="pdfForm" enctype="multipart/form-data">
-    <label for="file">Select PDF:</label>
-    <input type="file" id="file" name="file" accept=".pdf" required><br><br>
+      <input type="password" id="password" name="password" placeholder="Enter password to lock PDF" style="display: none;" />
 
-    <label for="tool">Select Tool:</label>
-    <select name="tool" id="tool">
-      <option value="compress">Compress PDF</option>
-      <option value="merge">Merge PDF</option>
-      <option value="split">Split PDF</option>
-      <option value="lock">Lock PDF</option>
-      <option value="convert">Convert PDF to Image</option>
-    </select><br><br>
+      <button type="submit">Process Document</button>
+    </form>
 
-    <button type="submit">Process Document</button>
-  </form>
+    <div id="processing-container">
+      <p>Processing... Please wait ⏳</p>
+      <div class="progress-bar">
+        <div class="progress" id="progress-bar"></div>
+      </div>
+    </div>
 
-  <div id="status" style="margin-top: 30px;"></div>
+    <div id="result-container">
+      ✅ Done! Your processed file has been downloaded.
+    </div>
+  </div>
+
   <script>
     const form = document.getElementById('pdfForm');
-    const statusDiv = document.getElementById('status');
+    const fileInput = document.getElementById('file');
+    const toolSelect = document.getElementById('tool');
+    const passwordField = document.getElementById('password');
+    const processingContainer = document.getElementById('processing-container');
+    const resultContainer = document.getElementById('result-container');
+    const progressBar = document.getElementById('progress-bar');
+
+    // Change file input based on selected tool
+    toolSelect.addEventListener('change', function () {
+      const tool = this.value;
+
+      if (tool === 'merge') {
+        fileInput.setAttribute('multiple', 'multiple');
+      } else {
+        fileInput.removeAttribute('multiple');
+      }
+
+      if (tool === 'lock') {
+        passwordField.style.display = 'block';
+      } else {
+        passwordField.style.display = 'none';
+        passwordField.value = '';
+      }
+    });
 
     form.addEventListener('submit', async (e) => {
       e.preventDefault();
-      statusDiv.innerHTML = "Uploading and processing... ⏳";
 
-      const formData = new FormData(form);
+      if (fileInput.files.length === 0) {
+        alert("Please select at least one PDF file.");
+        return;
+      }
+
+      processingContainer.style.display = 'block';
+      resultContainer.style.display = 'none';
+      progressBar.style.width = '30%';
+
+      const formData = new FormData();
+      const tool = toolSelect.value;
+
+      for (const file of fileInput.files) {
+        formData.append("file", file);
+      }
+
+      formData.append("tool", tool);
+
+      if (tool === 'lock' && passwordField.value.trim() !== '') {
+        formData.append("password", passwordField.value.trim());
+      }
 
       try {
         const response = await fetch('/process', {
@@ -42,22 +143,28 @@
         });
 
         if (!response.ok) {
-          throw new Error('Server returned ' + response.status);
+          throw new Error("Server error " + response.status);
         }
 
+        progressBar.style.width = '60%';
         const blob = await response.blob();
-        const downloadUrl = URL.createObjectURL(blob);
+        progressBar.style.width = '90%';
+
+        const url = window.URL.createObjectURL(blob);
         const a = document.createElement('a');
-        a.href = downloadUrl;
-        a.download = "processed.pdf";
+        a.href = url;
+        a.download = 'processed.pdf';
         document.body.appendChild(a);
         a.click();
         a.remove();
-        URL.revokeObjectURL(downloadUrl);
+        window.URL.revokeObjectURL(url);
 
-        statusDiv.innerHTML = "✅ Done! Your file has been downloaded.";
+        progressBar.style.width = '100%';
+        processingContainer.style.display = 'none';
+        resultContainer.style.display = 'block';
       } catch (err) {
-        statusDiv.innerHTML = "❌ Error: " + err.message;
+        alert('❌ Error: ' + err.message);
+        processingContainer.style.display = 'none';
       }
     });
   </script>
